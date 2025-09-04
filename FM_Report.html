@@ -1,0 +1,234 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Market Poll + Task Delegation</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #000; /* black background */
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 20px;
+      color: #fff;
+      text-align: center;
+    }
+
+    .step {
+      background: #111;
+      padding: 30px 40px;
+      border-radius: 20px;
+      box-shadow: 0 8px 20px rgba(255,255,255,0.1);
+      max-width: 500px;
+      width: 90%;
+      text-align: center;
+      animation: fadeIn 0.6s ease;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    input[type="text"] {
+      padding: 12px 15px;
+      width: 80%;
+      border-radius: 10px;
+      border: 1px solid #444;
+      background: #222;
+      color: #fff;
+      margin-top: 10px;
+      font-size: 1rem;
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 12px 24px;
+      background: #fff;
+      color: #000;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    button:hover {
+      background: #ddd;
+    }
+
+    label {
+      display: block;
+      margin: 10px 0;
+      font-size: 1rem;
+      text-align: left;
+      cursor: pointer;
+      color: #ccc;
+    }
+
+    input[type="radio"] {
+      margin-right: 10px;
+      transform: scale(1.2);
+      accent-color: #fff;
+    }
+
+    #confirmation {
+      font-size: 1.4rem;
+      font-weight: bold;
+      color: #fff;
+      margin-top: 20px;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <h1> Financial Market Poll with Task Delegation</h1>
+
+    <!-- STEP 1 -->
+    <div id="page1" class="step">
+      <h2>Enter your name:</h2>
+      <input type="text" id="userName" placeholder="Enter your name" required />
+      <br>
+      <button onclick="goToPage2()">Next</button>
+    </div>
+
+    <!-- STEP 2 -->
+    <div id="page2" class="step hidden">
+      <h2>Anong market gagamitin natin sa report?</h2>
+      <form id="pollForm">
+        <div id="marketChoices"></div>
+        <button type="submit">Submit</button>
+      </form>
+    </div>
+
+    <!-- STEP 3 -->
+    <div id="page3" class="step hidden">
+      <h2>Role Assignment:</h2>
+      <p id="confirmation"></p>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyCT_dEXJjslOXtCgexc-2Vwnq9euUhrzFM",
+      authDomain: "fm-report-delegation.firebaseapp.com",
+      projectId: "fm-report-delegation",
+      storageBucket: "fm-report-delegation.firebasestorage.app",
+      messagingSenderId: "1062909725832",
+      appId: "1:1062909725832:web:e7011d38b348281e11233d"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Market choices
+    const markets = [
+      "Primary Market","Secondary Market","Money Market","Capital Market",
+      "Bond Market","Stock Market","Mortgage Market","Consumer Credit Market",
+      "Auction Market","Negotiation Market","Organized Market","Over-the-Counter Market",
+      "Spot Market","Futures Market","Options Market","Foreign Exchange Market"
+    ];
+
+    // Task Delegation areas
+    const tasks = {
+      "Situation": 2,
+      "Problem": 2,
+      "Alternative": 2,
+      "Decision": 2,
+      "Execution": 2
+    };
+
+    let userName = "";
+
+    // Load market choices dynamically
+    const marketDiv = document.getElementById("marketChoices");
+    markets.forEach((m) => {
+      const label = document.createElement("label");
+      label.innerHTML = `<input type="radio" name="market" value="${m}" required> ${m}`;
+      marketDiv.appendChild(label);
+    });
+
+    // Step 1 → Step 2
+    window.goToPage2 = function() {
+      userName = document.getElementById("userName").value.trim();
+      if (!userName) {
+        alert("Please enter your name.");
+        return;
+      }
+      document.getElementById("page1").classList.add("hidden");
+      document.getElementById("page2").classList.remove("hidden");
+    };
+
+    // Handle vote submission
+    document.getElementById("pollForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const choice = document.querySelector('input[name="market"]:checked').value;
+
+      let assigned = null;
+      const areas = Object.keys(tasks);
+      while (!assigned && areas.length > 0) {
+        const randomIndex = Math.floor(Math.random() * areas.length);
+        const area = areas[randomIndex];
+        const docRef = doc(db, "tasks", area);
+        const snap = await getDoc(docRef);
+        let count = snap.exists() ? snap.data().count : 0;
+
+        if (count < tasks[area]) {
+          assigned = area;
+          await setDoc(docRef, { count: count + 1 });
+        } else {
+          areas.splice(randomIndex, 1);
+        }
+      }
+
+      if (!assigned) {
+        assigned = "All slots filled 😅";
+      }
+
+      await setDoc(doc(db, "votes", userName), {
+        name: userName,
+        market: choice,
+        role: assigned
+      });
+
+      document.getElementById("page2").classList.add("hidden");
+      document.getElementById("page3").classList.remove("hidden");
+      document.getElementById("confirmation").innerText =
+        `Hi ${userName}, you were assigned to the ${assigned}.`;
+
+      showConfetti();
+    });
+  </script>
+
+  <!-- Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  <script>
+    function showConfetti() {
+      confetti({
+        particleCount: 200,
+        spread: 90,
+        origin: { y: 0.6 }
+      });
+    }
+  </script>
+</body>
+</html>
